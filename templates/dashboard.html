@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Dashboard socio‑sanitaire</h1>
+
+{% if empty %}
+<p>Aucune donnée pour l’instant.</p>
+{% else %}
+<div class="cards-row">
+    <div class="card">
+        <h3>Population</h3>
+        <p class="big">{{ stats.n }}</p>
+    </div>
+    <div class="card">
+        <h3>Âge moyen</h3>
+        <p class="big">{{ stats.age_mean }}</p>
+    </div>
+    <div class="card">
+        <h3>IMC moyen</h3>
+        <p class="big">{{ stats.imc_mean }}</p>
+    </div>
+    <div class="card">
+        <h3>Revenu moyen</h3>
+        <p class="big">{{ stats.rev_mean }} FCFA</p>
+    </div>
+</div>
+
+<div class="cards-row">
+    <div class="card">
+        <h3>Répartition par sexe</h3>
+        <ul>
+        {% for s, c in sexe_counts.items() %}
+            <li>{{ s }} : {{ c }}</li>
+        {% endfor %}
+        </ul>
+    </div>
+    <div class="card">
+        <h3>Répartition par région</h3>
+        <ul>
+        {% for r, c in region_counts.items() %}
+            <li>{{ r }} : {{ c }}</li>
+        {% endfor %}
+        </ul>
+    </div>
+    <div class="card">
+        <h3>Niveau d’étude</h3>
+        <ul>
+        {% for n, c in niveau_counts.items() %}
+            <li>{{ n }} : {{ c }}</li>
+        {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
