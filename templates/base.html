@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title or "Étude socio-sanitaire" }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="layout">
+    <aside class="sidebar">
+        <h2>SocioHealth CM</h2>
+        <a href="{{ url_for('index') }}">Accueil</a>
+        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('analytics') }}">Analyses EC2</a>
+        <a href="{{ url_for('upload') }}">Import CSV</a>
+        <a href="{{ url_for('export_pdf') }}">Export PDF</a>
+    </aside>
+    <main class="content">
+        {% block content %}{% endblock %}
+    </main>
+</div>
+</body>
+</html>
