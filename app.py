@@ -1,193 +1,315 @@
-import streamlit as st
-import pandas as pd
+from flask import Flask, render_template, request, redirect, url_for, send_file
 import sqlite3
-import plotly.express as px
-import folium
-from streamlit_folium import st_folium
-from sklearn.linear_model import LinearRegression
-import numpy as np
-import time
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Image
-from reportlab.lib.styles import getSampleStyleSheet
-import matplotlib.pyplot as plt
+import pandas as pd
+import random
+from fpdf import FPDF
+import os
 
-# ================= CONFIG =================
-st.set_page_config(page_title="AgroData CM", layout="wide")
+from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.decomposition import PCA
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import r2_score, mean_squared_error, accuracy_score
 
-# ================= ANIMATION ACCUEIL =================
-with st.spinner("Chargement de AgroData CM..."):
-    time.sleep(2)
+app = Flask(__name__)
+DB = "population.db"
 
-# ================= STYLE =================
-st.markdown("""
-<style>
-body {background-color: #0e1117;}
-h1 {color: #00c853; text-align:center;}
-.stMetric {background-color: #1c1f26; padding:15px; border-radius:10px;}
-button[kind="primary"] {background-color:#00c853; color:white;}
-</style>
-""", unsafe_allow_html=True)
 
-# ================= HEADER =================
-st.markdown("""
-<h1>🌱 AgroData CM</h1>
-<p style='text-align:center;'>Analyse intelligente des données agricoles 🇨🇲</p>
-""", unsafe_allow_html=True)
+# ---------- DB ----------
+def get_conn():
+    conn = sqlite3.connect(DB)
+    conn.row_factory = sqlite3.Row
+    return conn
 
-# ================= NAVIGATION =================
-menu = st.sidebar.radio("📌 Navigation", ["🏠 Accueil", "📊 Dashboard"])
-
-# ================= PAGE ACCUEIL =================
-if menu == "🏠 Accueil":
-
-    st.success("Bienvenue sur une plateforme intelligente d'analyse agricole 🇨🇲")
-
-    st.markdown("""
-    ## 🎯 Objectif
-    Transformer les données agricoles en décisions utiles.
-
-    ## ⚙️ Fonctionnalités
-    - 📥 Collecte des données
-    - 📊 Visualisation simple
-    - 🧠 Analyse automatique
-    - 🏆 Comparaison des régions
-    - 📥 Export PDF
+def init_db():
+    conn = get_conn()
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS population (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        age INTEGER,
+        sexe TEXT,
+        region TEXT,
+        niveau_etude TEXT,
+        statut_matrimonial TEXT,
+        taille_menage INTEGER,
+        revenu REAL,
+        poids REAL,
+        taille REAL,
+        imc REAL,
+        activite_physique INTEGER,
+        tabac TEXT,
+        alcool TEXT,
+        sommeil INTEGER
+    )
     """)
+    conn.commit()
+    conn.close()
 
-    st.info("👉 Utilisez le menu à gauche pour accéder au Dashboard")
+def seed_100():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) as c FROM population")
+    if cur.fetchone()["c"] >= 100:
+        conn.close()
+        return
 
-# ================= DASHBOARD =================
-else:
+    regions = ["Centre","Littoral","Ouest","Nord","Extrême-Nord",
+               "Sud","Est","Adamaoua","Nord-Ouest","Sud-Ouest"]
+    niveaux = ["Primaire","Secondaire","Université","Supérieur"]
+    statuts = ["Célibataire","Marié(e)","Divorcé(e)","Veuf(ve)"]
+    sexes = ["Homme","Femme"]
 
-    st.title("📊 Dashboard intelligent")
+    for _ in range(100):
+        age = random.randint(18, 75)
+        sexe = random.choice(sexes)
+        region = random.choice(regions)
+        niveau = random.choice(niveaux)
+        statut = random.choice(statuts)
+        taille_menage = random.randint(1, 10)
+        revenu = random.randint(30000, 500000)
+        poids = random.uniform(45, 110)
+        taille = random.uniform(1.5, 1.9)
+        imc = poids / (taille ** 2)
+        activite = random.randint(0, 300)
+        tabac = random.choice(["Oui","Non"])
+        alcool = random.choice(["Oui","Non"])
+        sommeil = random.randint(1, 5)
 
-    # ================= DATABASE =================
-    conn = sqlite3.connect('database.db')
-    conn.execute('''CREATE TABLE IF NOT EXISTS data
-                 (region TEXT, prix REAL, production REAL, superficie REAL)''')
+        conn.execute("""
+        INSERT INTO population
+        (age,sexe,region,niveau_etude,statut_matrimonial,taille_menage,
+         revenu,poids,taille,imc,activite_physique,tabac,alcool,sommeil)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (age,sexe,region,niveau,statut,taille_menage,revenu,
+              poids,taille,imc,activite,tabac,alcool,sommeil))
+    conn.commit()
+    conn.close()
 
-    regions = ["Centre","Littoral","Ouest","Nord","Sud"]
 
-    # ================= DONNÉES AUTO =================
-    df_check = pd.read_sql_query("SELECT * FROM data", conn)
+# ---------- ROUTES ----------
+@app.route("/")
+def index():
+    return render_template("index.html")
 
-    if df_check.empty:
-        np.random.seed(42)
-        for _ in range(100):
-            region = np.random.choice(regions)
-            prix = np.random.randint(500, 5000)
-            superficie = np.random.randint(1, 50)
-            production = superficie * np.random.uniform(1.5, 3.5)
-            conn.execute("INSERT INTO data VALUES (?,?,?,?)",
-                         (region, prix, production, superficie))
-        conn.commit()
 
-    df = pd.read_sql_query("SELECT * FROM data", conn)
+@app.route("/add", methods=["POST"])
+def add():
+    data = request.form
+    age = int(data["age"])
+    sexe = data["sexe"]
+    region = data["region"]
+    niveau = data["niveau_etude"]
+    statut = data["statut_matrimonial"]
+    taille_menage = int(data["taille_menage"])
+    revenu = float(data["revenu"])
+    poids = float(data["poids"])
+    taille = float(data["taille"])
+    imc = poids / (taille ** 2)
+    activite = int(data["activite_physique"])
+    tabac = data["tabac"]
+    alcool = data["alcool"]
+    sommeil = int(data["sommeil"])
 
-    # ================= ANALYSE AUTOMATIQUE =================
-    region_stats = df.groupby("region")["production"].mean().sort_values(ascending=False)
+    conn = get_conn()
+    conn.execute("""
+    INSERT INTO population
+    (age,sexe,region,niveau_etude,statut_matrimonial,taille_menage,
+     revenu,poids,taille,imc,activite_physique,tabac,alcool,sommeil)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    """, (age,sexe,region,niveau,statut,taille_menage,revenu,
+          poids,taille,imc,activite,tabac,alcool,sommeil))
+    conn.commit()
+    conn.close()
+    return redirect(url_for("dashboard"))
 
-    best_region = region_stats.index[0]
-    top3 = region_stats.head(3)
 
-    st.success(f"🧠 Analyse : La région {best_region} est la plus productive.")
+@app.route("/dashboard")
+def dashboard():
+    conn = get_conn()
+    df = pd.read_sql("SELECT * FROM population", conn)
+    conn.close()
 
-    st.subheader("🏆 Top 3 des régions")
-    for i, (region, value) in enumerate(top3.items(), start=1):
-        st.write(f"{i}. {region} → {round(value,2)}")
+    if df.empty:
+        return render_template("dashboard.html", empty=True)
 
-    # ================= FILTRE =================
-    st.markdown("### 🔎 Filtrer les données")
-    colf1, colf2 = st.columns(2)
+    stats = {
+        "n": len(df),
+        "age_mean": round(df["age"].mean(), 1),
+        "imc_mean": round(df["imc"].mean(), 1),
+        "rev_mean": round(df["revenu"].mean(), 0)
+    }
+    sexe_counts = df["sexe"].value_counts().to_dict()
+    region_counts = df["region"].value_counts().to_dict()
+    niveau_counts = df["niveau_etude"].value_counts().to_dict()
 
-    region_filter = colf1.selectbox("🌍 Région", ["Toutes"] + regions)
-    prix_max = colf2.slider("💰 Prix max", int(df['prix'].min()), int(df['prix'].max()), int(df['prix'].max()))
+    return render_template(
+        "dashboard.html",
+        empty=False,
+        stats=stats,
+        sexe_counts=sexe_counts,
+        region_counts=region_counts,
+        niveau_counts=niveau_counts
+    )
 
-    if region_filter != "Toutes":
-        df = df[df['region'] == region_filter]
 
-    df = df[df['prix'] <= prix_max]
+@app.route("/analytics")
+def analytics():
+    conn = get_conn()
+    df = pd.read_sql("SELECT * FROM population", conn)
+    conn.close()
 
-    # ================= KPI =================
-    col1, col2, col3 = st.columns(3)
+    if df.empty:
+        return render_template("analytics.html", empty=True)
 
-    col1.metric("📈 Production", round(df['production'].mean(),2))
-    col2.metric("💰 Prix", round(df['prix'].mean(),2))
-    col3.metric("🌱 Superficie", round(df['superficie'].mean(),2))
-
-    # ================= GRAPHIQUES =================
-    st.subheader("📊 Visualisation")
-
-    fig1 = px.bar(df, x="region", y="production", color="region",
-                  title="Production par région")
-    st.plotly_chart(fig1, use_container_width=True)
-
-    fig2 = px.histogram(df, x="prix", title="Distribution des prix")
-    st.plotly_chart(fig2, use_container_width=True)
-
-    fig3 = px.scatter(df, x="superficie", y="production", color="region",
-                      title="Superficie vs Production")
-    st.plotly_chart(fig3, use_container_width=True)
-
-    # ================= CARTE =================
-    st.subheader("🗺️ Carte du Cameroun")
-
-    coords = {
-        "Centre": [3.848, 11.502],
-        "Littoral": [4.051, 9.767],
-        "Ouest": [5.473, 10.417],
-        "Nord": [9.301, 13.397],
-        "Sud": [2.889, 11.157]
+    # ---------- Régression simple : revenu ~ âge ----------
+    Xs = df[["age"]].values
+    ys = df["revenu"].values
+    reg_s = LinearRegression().fit(Xs, ys)
+    ys_pred = reg_s.predict(Xs)
+    reg_simple = {
+        "coef": float(reg_s.coef_[0]),
+        "intercept": float(reg_s.intercept_),
+        "r2": float(r2_score(ys, ys_pred)),
+        "rmse": float(mean_squared_error(ys, ys_pred, squared=False))
     }
 
-    m = folium.Map(location=[5, 12], zoom_start=6)
+    # ---------- Régression multiple : revenu ~ âge + taille_menage + sommeil ----------
+    Xm = df[["age","taille_menage","sommeil"]].values
+    ym = df["revenu"].values
+    reg_m = LinearRegression().fit(Xm, ym)
+    ym_pred = reg_m.predict(Xm)
+    reg_multi = {
+        "coef": reg_m.coef_.tolist(),
+        "intercept": float(reg_m.intercept_),
+        "r2": float(r2_score(ym, ym_pred)),
+        "rmse": float(mean_squared_error(ym, ym_pred, squared=False))
+    }
 
-    for _, row in df.iterrows():
-        folium.CircleMarker(
-            location=coords[row['region']],
-            radius=5,
-            color="green",
-            fill=True
-        ).add_to(m)
+    # ---------- PCA ----------
+    Xp = df[["age","revenu","taille_menage","activite_physique","imc","sommeil"]].values
+    Xp_s = StandardScaler().fit_transform(Xp)
+    pca = PCA(n_components=2)
+    comps = pca.fit_transform(Xp_s)
+    pca_res = {
+        "explained": pca.explained_variance_ratio_.tolist(),
+        "comp1": comps[:,0].tolist(),
+        "comp2": comps[:,1].tolist()
+    }
 
-    st_folium(m, width=800)
+    # ---------- Classification supervisée : classe de revenu ----------
+    bins = [0, 100000, 300000, 1e9]
+    labels = ["faible","moyen","élevé"]
+    df["classe_revenu"] = pd.cut(df["revenu"], bins=bins, labels=labels)
+    le = LabelEncoder()
+    y_cls = le.fit_transform(df["classe_revenu"].astype(str))
+    X_cls = df[["age","taille_menage","activite_physique","imc","sommeil"]].values
+    X_tr, X_te, y_tr, y_te = train_test_split(X_cls, y_cls, test_size=0.3, random_state=42)
+    clf = LogisticRegression(max_iter=200).fit(X_tr, y_tr)
+    y_pred = clf.predict(X_te)
+    cls_sup = {
+        "classes": le.classes_.tolist(),
+        "accuracy": float(accuracy_score(y_te, y_pred)),
+        "coef": clf.coef_.tolist(),
+        "intercept": clf.intercept_.tolist()
+    }
 
-    # ================= RÉGRESSION =================
-    st.subheader("📉 Régression linéaire")
+    # ---------- Clustering (K-Means) ----------
+    Xc = df[["age","revenu","activite_physique","imc","sommeil"]].values
+    Xc_s = StandardScaler().fit_transform(Xc)
+    km = KMeans(n_clusters=3, n_init=10, random_state=42)
+    labels_km = km.fit_predict(Xc_s)
+    df["cluster"] = labels_km
+    cluster_counts = df["cluster"].value_counts().to_dict()
 
-    model = LinearRegression()
-    model.fit(df[['superficie']], df['production'])
+    return render_template(
+        "analytics.html",
+        empty=False,
+        reg_simple=reg_simple,
+        reg_multi=reg_multi,
+        pca_res=pca_res,
+        cls_sup=cls_sup,
+        cluster_counts=cluster_counts
+    )
 
-    coef = model.coef_[0]
-    st.info(f"Relation superficie-production : {round(coef,2)}")
 
-    # ================= PDF =================
-    def generate_pdf():
-        plt.figure()
-        df.groupby("region")["production"].mean().plot(kind='bar')
-        plt.title("Production par région")
-        plt.savefig("graph.png")
-        plt.close()
+@app.route("/upload", methods=["GET","POST"])
+def upload():
+    if request.method == "POST":
+        file = request.files.get("file")
+        if not file:
+            return redirect(url_for("upload"))
+        df = pd.read_csv(file)
+        required = {"age","sexe","region","niveau_etude","statut_matrimonial",
+                    "taille_menage","revenu","poids","taille",
+                    "activite_physique","tabac","alcool","sommeil"}
+        if not required.issubset(df.columns):
+            return "Colonnes manquantes", 400
 
-        doc = SimpleDocTemplate("rapport.pdf")
-        styles = getSampleStyleSheet()
+        conn = get_conn()
+        for _, row in df.iterrows():
+            imc = row["poids"] / (row["taille"] ** 2)
+            conn.execute("""
+            INSERT INTO population
+            (age,sexe,region,niveau_etude,statut_matrimonial,taille_menage,
+             revenu,poids,taille,imc,activite_physique,tabac,alcool,sommeil)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """, (int(row["age"]), row["sexe"], row["region"], row["niveau_etude"],
+                  row["statut_matrimonial"], int(row["taille_menage"]),
+                  float(row["revenu"]), float(row["poids"]), float(row["taille"]),
+                  imc, int(row["activite_physique"]), row["tabac"],
+                  row["alcool"], int(row["sommeil"])))
+        conn.commit()
+        conn.close()
+        return redirect(url_for("dashboard"))
+    return render_template("upload.html")
 
-        content = []
-        content.append(Paragraph("Rapport AgroData CM", styles['Title']))
-        content.append(Paragraph(f"Production moyenne: {round(df['production'].mean(),2)}", styles['Normal']))
-        content.append(Image("graph.png"))
 
-        doc.build(content)
+@app.route("/export_pdf")
+def export_pdf():
+    conn = get_conn()
+    df = pd.read_sql("SELECT * FROM population", conn)
+    conn.close()
+    if df.empty:
+        return "Pas de données", 400
 
-    if st.button("📥 Générer rapport PDF"):
-        generate_pdf()
-        with open("rapport.pdf", "rb") as f:
-            st.download_button("⬇️ Télécharger PDF", f, file_name="rapport.pdf")
+    class PDF(FPDF):
+        def header(self):
+            self.set_fill_color(15, 23, 42)
+            self.rect(0, 0, 210, 15, "F")
+            self.set_text_color(250, 204, 21)
+            self.set_font("Arial", "B", 12)
+            self.cell(0, 10, "Étude socio-sanitaire - Rapport descriptif", 0, 1, "C")
+            self.ln(5)
+        def footer(self):
+            self.set_y(-10)
+            self.set_font("Arial", "I", 8)
+            self.set_text_color(150, 150, 150)
+            self.cell(0, 5, f"Page {self.page_no()}", 0, 0, "C")
 
-    # ================= ANIMATION =================
-    if st.button("⚡ Lancer analyse avancée"):
-        progress = st.progress(0)
-        for i in range(100):
-            time.sleep(0.01)
-            progress.progress(i+1)
-        st.success("✔ Analyse terminée")
+    pdf = PDF()
+    pdf.add_page()
+    pdf.set_font("Arial", "", 10)
+
+    txt = f"Nombre d'individus : {len(df)}\n"
+    txt += f"Âge moyen : {df['age'].mean():.1f}\n"
+    txt += f"IMC moyen : {df['imc'].mean():.1f}\n"
+    txt += f"Revenu moyen : {df['revenu'].mean():.0f} FCFA\n"
+    pdf.multi_cell(0, 5, txt)
+
+    pdf.ln(5)
+    pdf.set_font("Arial", "B", 11)
+    pdf.cell(0, 6, "Répartition par sexe :", 0, 1)
+    pdf.set_font("Arial", "", 10)
+    for s, c in df["sexe"].value_counts().items():
+        pdf.cell(0, 5, f"- {s} : {c}", 0, 1)
+
+    pdf_output = "rapport_population.pdf"
+    pdf.output(pdf_output)
+    return send_file(pdf_output, as_attachment=True)
+
+
+if __name__ == "__main__":
+    init_db()
+    seed_100()
+    app.run(debug=True)
