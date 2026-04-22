@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="hero">
+    <h1>📊 Étude Socio‑Sanitaire du Cameroun</h1>
+    <p class="subtitle">
+        Application de collecte et d’analyse de données, développée dans le cadre du 
+        <strong>Programme INF 232 – EC2 (Analyse de données)</strong>.
+    </p>
+</div>
+
+<div class="card">
+    <h2>🎯 Objectif de l’application</h2>
+    <p>
+        Cette plateforme permet d’étudier une <strong>population d’individus</strong> à travers des 
+        données socio‑démographiques et sanitaires.  
+        Elle offre des outils d’analyse statistique avancée pour comprendre les tendances, 
+        les comportements et les profils de la population camerounaise.
+    </p>
+</div>
+
+<div class="card">
+    <h2>🧩 Fonctionnalités principales</h2>
+    <ul>
+        <li>➕ <strong>Ajouter des individus</strong> dans la base de données</li>
+        <li>📥 <strong>Importer un fichier CSV</strong> contenant plusieurs individus</li>
+        <li>📊 <strong>Consulter le Dashboard</strong> (statistiques descriptives)</li>
+        <li>🧠 <strong>Effectuer des analyses EC2</strong> :
+            <ul>
+                <li>Régression linéaire simple</li>
+                <li>Régression linéaire multiple</li>
+                <li>Réduction de dimension (PCA)</li>
+                <li>Classification supervisée</li>
+                <li>Clustering (classification non supervisée)</li>
+            </ul>
+        </li>
+        <li>📄 <strong>Exporter un rapport PDF</strong> de synthèse</li>
+    </ul>
+</div>
+
+<div class="card">
+    <h2>🚀 Comment utiliser l’application ?</h2>
+    <ol>
+        <li><strong>Ajoutez des individus</strong> (ou utilisez les 100 individus générés automatiquement).</li>
+        <li>Accédez au <strong>Dashboard</strong> pour visualiser les statistiques globales.</li>
+        <li>Rendez-vous dans <strong>Analyses</strong> pour explorer les modèles statistiques.</li>
+        <li>Générez un <strong>rapport PDF</strong> si nécessaire.</li>
+    </ol>
+</div>
+
+<div style="text-align:center; margin-top:2rem;">
+    <a href="{{ url_for('dashboard') }}" class="cta-button">Accéder au Dashboard</a>
+</div>
+
+{% endblock %}
