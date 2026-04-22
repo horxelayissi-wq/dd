@@ -2,6 +2,7 @@ streamlit
 pandas
 fpdf
 plotly
+flask
 scikit-learn
 folium
 streamlit-folium
