@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Analyses EC2</h1>
+
+{% if empty %}
+<p>Pas assez de données pour les analyses.</p>
+{% else %}
+
+<div class="cards-row">
+    <div class="card">
+        <h3>Régression linéaire simple</h3>
+        <p><strong>Modèle :</strong> revenu ~ âge</p>
+        <p>revenu = {{ reg_simple.coef|round(2) }} × âge + {{ reg_simple.intercept|round(2) }}</p>
+        <p>R² = {{ reg_simple.r2|round(3) }}</p>
+        <p>RMSE = {{ reg_simple.rmse|round(1) }}</p>
+    </div>
+    <div class="card">
+        <h3>Régression linéaire multiple</h3>
+        <p><strong>Modèle :</strong> revenu ~ âge + taille_menage + sommeil</p>
+        <p>Coefficients : {{ reg_multi.coef }}</p>
+        <p>Intercept : {{ reg_multi.intercept|round(2) }}</p>
+        <p>R² = {{ reg_multi.r2|round(3) }}</p>
+        <p>RMSE = {{ reg_multi.rmse|round(1) }}</p>
+    </div>
+    <div class="card">
+        <h3>PCA (réduction de dimension)</h3>
+        <p>Variance expliquée PC1 : {{ (pca_res.explained[0]*100)|round(1) }} %</p>
+        <p>Variance expliquée PC2 : {{ (pca_res.explained[1]*100)|round(1) }} %</p>
+        <p>Individus projetés : {{ pca_res.comp1|length }}</p>
+    </div>
+</div>
+
+<div class="cards-row">
+    <div class="card">
+        <h3>Classification supervisée</h3>
+        <p><strong>Cible :</strong> classe de revenu (faible / moyen / élevé)</p>
+        <p>Classes : {{ cls_sup.classes }}</p>
+        <p>Accuracy : {{ (cls_sup.accuracy*100)|round(1) }} %</p>
+    </div>
+    <div class="card">
+        <h3>Clustering (K-Means)</h3>
+        <p><strong>Variables :</strong> âge, revenu, activité, IMC, sommeil</p>
+        <ul>
+        {% for cl, c in cluster_counts.items() %}
+            <li>Cluster {{ cl }} : {{ c }} individus</li>
+        {% endfor %}
+        </ul>
+    </div>
+</div>
+
+{% endif %}
+{% endblock %}
