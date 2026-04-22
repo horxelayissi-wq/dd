@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, send_file
 import sqlite3
 import pandas as pd
 import random
+import os
 from fpdf import FPDF
 
 from sklearn.linear_model import LinearRegression, LogisticRegression
@@ -311,4 +312,6 @@ def export_pdf():
 if __name__ == "__main__":
     init_db()
     seed_100()
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
+
