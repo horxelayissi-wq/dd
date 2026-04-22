@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Import CSV</h1>
+<p>Colonnes requises : age, sexe, region, niveau_etude, statut_matrimonial, taille_menage, revenu, poids, taille, activite_physique, tabac, alcool, sommeil</p>
+
+<form action="{{ url_for('upload') }}" method="POST" enctype="multipart/form-data" class="card">
+    <input type="file" name="file" accept=".csv" required>
+    <button type="submit">Importer</button>
+</form>
+{% endblock %}
