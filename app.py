@@ -3,7 +3,6 @@ import sqlite3
 import pandas as pd
 import random
 from fpdf import FPDF
-import os
 
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.decomposition import PCA
@@ -162,7 +161,7 @@ def analytics():
     if df.empty:
         return render_template("analytics.html", empty=True)
 
-    # ---------- Régression simple : revenu ~ âge ----------
+    # Régression simple : revenu ~ âge
     Xs = df[["age"]].values
     ys = df["revenu"].values
     reg_s = LinearRegression().fit(Xs, ys)
@@ -174,7 +173,7 @@ def analytics():
         "rmse": float(mean_squared_error(ys, ys_pred, squared=False))
     }
 
-    # ---------- Régression multiple : revenu ~ âge + taille_menage + sommeil ----------
+    # Régression multiple : revenu ~ âge + taille_menage + sommeil
     Xm = df[["age","taille_menage","sommeil"]].values
     ym = df["revenu"].values
     reg_m = LinearRegression().fit(Xm, ym)
@@ -186,7 +185,7 @@ def analytics():
         "rmse": float(mean_squared_error(ym, ym_pred, squared=False))
     }
 
-    # ---------- PCA ----------
+    # PCA
     Xp = df[["age","revenu","taille_menage","activite_physique","imc","sommeil"]].values
     Xp_s = StandardScaler().fit_transform(Xp)
     pca = PCA(n_components=2)
@@ -197,7 +196,7 @@ def analytics():
         "comp2": comps[:,1].tolist()
     }
 
-    # ---------- Classification supervisée : classe de revenu ----------
+    # Classification supervisée : classe de revenu
     bins = [0, 100000, 300000, 1e9]
     labels = ["faible","moyen","élevé"]
     df["classe_revenu"] = pd.cut(df["revenu"], bins=bins, labels=labels)
@@ -214,7 +213,7 @@ def analytics():
         "intercept": clf.intercept_.tolist()
     }
 
-    # ---------- Clustering (K-Means) ----------
+    # Clustering (K-Means)
     Xc = df[["age","revenu","activite_physique","imc","sommeil"]].values
     Xc_s = StandardScaler().fit_transform(Xc)
     km = KMeans(n_clusters=3, n_init=10, random_state=42)
